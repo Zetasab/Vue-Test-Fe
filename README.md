@@ -35,6 +35,17 @@ npm install
 npm run dev
 ```
 
+## SignalR setup
+
+1. Crea tu archivo `.env` tomando como base `.env.example`.
+2. Ajusta `VITE_SIGNALR_HUB_URL` con la URL real de tu Hub (ejemplo: `https://localhost:5001/chathub`).
+3. Si en backend usas otros nombres de metodos/eventos, cambia:
+  - `VITE_SIGNALR_JOIN_METHOD`
+  - `VITE_SIGNALR_SEND_METHOD`
+  - `VITE_SIGNALR_RECEIVE_EVENT`
+
+Con eso, la ruta `/` del frontend levanta una UI de chat conectada por SignalR.
+
 ### Type-Check, Compile and Minify for Production
 
 ```sh
