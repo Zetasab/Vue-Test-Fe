@@ -121,6 +121,7 @@ async function request<TResponse>(
   }
 
   const url = buildUrl(path)
+  console.log(`[API] ${method} ${url}`)
 
   let response: Response
   try {

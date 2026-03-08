@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ChatsView from '@/views/ChatsView.vue'
+import FilterGamesView from '@/views/FilterGamesView.vue'
 import GameView from '@/views/GameView.vue'
 import HomeView from '@/views/HomeView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -21,6 +22,14 @@ const router = createRouter({
       path: '/game',
       name: 'game',
       component: GameView,
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/game-filter',
+      name: 'game-filter',
+      component: FilterGamesView,
       meta: {
         requiresAuth: true,
       },

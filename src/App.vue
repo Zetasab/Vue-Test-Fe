@@ -23,6 +23,7 @@ async function onLogout() {
       <nav class="links">
         <RouterLink to="/" class="link">Home</RouterLink>
         <RouterLink to="/game" class="link">Game</RouterLink>
+        <RouterLink to="/game-filter" class="link">Filter Games</RouterLink>
         <RouterLink to="/chats" class="link">Chats</RouterLink>
       </nav>
 

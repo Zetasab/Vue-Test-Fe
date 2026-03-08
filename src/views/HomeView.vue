@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
-import { logout } from '@/services/auth'
+import { logout } from '../services/auth'
 
 const router = useRouter()
 
@@ -19,6 +19,7 @@ async function onLogout() {
 
       <div class="actions">
         <RouterLink class="action-link" to="/game">Ir a Game</RouterLink>
+        <RouterLink class="action-link" to="/game-filter">Ir a Filter Games</RouterLink>
         <RouterLink class="action-link" to="/chats">Ir a Chats</RouterLink>
         <button class="logout" @click="onLogout">Cerrar sesion</button>
       </div>
