@@ -105,7 +105,7 @@ async function onSubmit() {
 
 <style scoped>
 .login-page {
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--app-navbar-height, 0px));
   display: grid;
   place-items: center;
   padding: 1.25rem;

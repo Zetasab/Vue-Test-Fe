@@ -56,6 +56,20 @@ export function getSessionUser(): string {
   }
 }
 
+export function getSessionToken(): string {
+  const raw = sessionStorage.getItem(AUTH_SESSION_KEY)
+  if (!raw) {
+    return ''
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthSession>
+    return typeof parsed.token === 'string' ? parsed.token.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
 export async function login(username: string, password: string): Promise<boolean> {
   const payload: UserLogin = {
     username: username.trim(),

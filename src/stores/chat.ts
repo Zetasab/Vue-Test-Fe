@@ -1,10 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import type { IncomingChatMessage } from '@/services/signalrChat'
+import type { UserModel } from '@/models/users/user.model'
+import type { IncomingChatMessageEvent } from '@/services/signalrChat'
 import { SignalRChatClient } from '@/services/signalrChat'
+import { getAllUsers } from '@/services/users/user.service'
 
-export interface ChatMessage extends IncomingChatMessage {
+export interface ChatMessage extends IncomingChatMessageEvent {
   id: string
 }
 
@@ -13,14 +15,19 @@ export const useChatStore = defineStore('chat', () => {
 
   const connected = ref(false)
   const loading = ref(false)
-  const room = ref('general')
-  const user = ref('')
+  const senderUserId = ref('')
+  const receiverUserId = ref('')
+  const users = ref<UserModel[]>([])
   const messages = ref<ChatMessage[]>([])
   const error = ref('')
+  const errorDetails = ref('')
+  const loadingUsers = ref(false)
 
-  const canSend = computed(() => connected.value && !!user.value.trim())
+  const canSend = computed(
+    () => connected.value && !!receiverUserId.value.trim(),
+  )
 
-  function addMessage(message: IncomingChatMessage) {
+  function addMessage(message: IncomingChatMessageEvent) {
     messages.value.push({
       ...message,
       id: crypto.randomUUID(),
@@ -28,15 +35,17 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function connect() {
+    if (connected.value || loading.value) {
+      return
+    }
+
     loading.value = true
     error.value = ''
+    errorDetails.value = ''
 
     try {
       await client.connect(addMessage)
       connected.value = true
-      if (room.value.trim()) {
-        await client.joinRoom(room.value.trim())
-      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to connect to SignalR Hub'
       connected.value = false
@@ -45,18 +54,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function reconnectToRoom(nextRoom: string) {
-    room.value = nextRoom
-
-    if (!connected.value || !room.value.trim()) {
-      return
-    }
+  async function fetchUsers() {
+    loadingUsers.value = true
+    error.value = ''
+    errorDetails.value = ''
 
     try {
-      await client.joinRoom(room.value.trim())
+      const list = await getAllUsers()
+      users.value = Array.isArray(list) ? list.filter((item) => item?.isActive !== false) : []
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Could not join room'
+      error.value = err instanceof Error ? err.message : 'Failed to load users'
+      users.value = []
+    } finally {
+      loadingUsers.value = false
     }
+  }
+
+  async function bootstrap() {
+    await Promise.all([fetchUsers(), connect()])
   }
 
   async function send(text: string) {
@@ -66,9 +81,33 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     try {
-      await client.sendMessage(user.value.trim(), clean, room.value.trim() || undefined)
+      await client.sendMessage(receiverUserId.value.trim(), clean)
+      errorDetails.value = ''
     } catch (err) {
+      const details = {
+        senderUserId: senderUserId.value,
+        receiverUserId: receiverUserId.value,
+        message: clean,
+        error:
+          err instanceof Error
+            ? {
+                name: err.name,
+                message: err.message,
+                stack: err.stack,
+                details: (err as Error & { details?: unknown }).details,
+              }
+            : err,
+      }
+
+      console.error('[ChatStore] Failed to send message', {
+        senderUserId: senderUserId.value,
+        receiverUserId: receiverUserId.value,
+        message: clean,
+        error: err,
+      })
+      console.log('[ChatStore] Failed to send message details', details)
       error.value = err instanceof Error ? err.message : 'Failed to send message'
+      errorDetails.value = JSON.stringify(details, null, 2)
     }
   }
 
@@ -83,13 +122,17 @@ export const useChatStore = defineStore('chat', () => {
   return {
     connected,
     loading,
-    room,
-    user,
+    senderUserId,
+    receiverUserId,
+    users,
     messages,
     error,
+    errorDetails,
+    loadingUsers,
     canSend,
     connect,
-    reconnectToRoom,
+    fetchUsers,
+    bootstrap,
     send,
     disconnect,
   }

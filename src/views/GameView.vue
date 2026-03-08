@@ -438,7 +438,7 @@ function nullable(value: string): string | null {
 
 <style scoped>
 .game-page {
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--app-navbar-height, 0px));
   padding: 1.25rem;
   background:
     radial-gradient(circle at top right, rgb(255 242 227 / 85%), transparent 42%),

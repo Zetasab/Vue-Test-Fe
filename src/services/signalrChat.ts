@@ -5,17 +5,28 @@ import {
   LogLevel,
 } from '@microsoft/signalr'
 
-export interface IncomingChatMessage {
-  user: string
+import { getSessionToken } from '@/services/auth'
+
+export interface IncomingChatMessageEvent {
+  senderUserId: string
+  senderUsername?: string
+  receiverUserId: string
   message: string
-  room?: string
-  createdAt: string
+  sentUtc: string
 }
 
-const HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL ?? 'https://localhost:5001/chathub'
+function buildHubUrl(): string {
+  const base = (
+    import.meta.env.VITE_SIGNALR_HUB_URL
+    ?? `${import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7116'}/hubs/chat`
+  ).trim()
+
+  return base.replace(/\/+$/, '')
+}
+
+const HUB_URL = buildHubUrl()
 
 const HUB_METHODS = {
-  joinRoom: import.meta.env.VITE_SIGNALR_JOIN_METHOD ?? 'JoinRoom',
   sendMessage: import.meta.env.VITE_SIGNALR_SEND_METHOD ?? 'SendMessage',
 }
 
@@ -23,30 +34,69 @@ const HUB_EVENTS = {
   receiveMessage: import.meta.env.VITE_SIGNALR_RECEIVE_EVENT ?? 'ReceiveMessage',
 }
 
-function normalizeMessage(payload: unknown): IncomingChatMessage {
+function formatErrorDetails(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const ownProps = Object.getOwnPropertyNames(error).reduce<Record<string, unknown>>(
+      (acc, key) => {
+        acc[key] = (error as unknown as Record<string, unknown>)[key]
+        return acc
+      },
+      {},
+    )
+
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+      ownProps,
+    }
+  }
+
+  if (error && typeof error === 'object') {
+    return error as Record<string, unknown>
+  }
+
+  return {
+    value: error,
+  }
+}
+
+function normalizeMessage(payload: unknown): IncomingChatMessageEvent {
+  const fallback: IncomingChatMessageEvent = {
+    senderUserId: 'unknown',
+    receiverUserId: 'unknown',
+    message: '',
+    sentUtc: new Date().toISOString(),
+  }
+
   if (typeof payload === 'string') {
     return {
-      user: 'Server',
+      ...fallback,
+      senderUserId: 'server',
       message: payload,
-      createdAt: new Date().toISOString(),
     }
   }
 
   if (payload && typeof payload === 'object') {
-    const maybeMessage = payload as Record<string, unknown>
+    const p = payload as Record<string, unknown>
 
     return {
-      user: String(maybeMessage.user ?? maybeMessage.username ?? 'Anon'),
-      message: String(maybeMessage.message ?? maybeMessage.text ?? ''),
-      room: maybeMessage.room ? String(maybeMessage.room) : undefined,
-      createdAt: String(maybeMessage.createdAt ?? new Date().toISOString()),
+      senderUserId: String(p.senderUserId ?? p.userId ?? p.user ?? 'unknown'),
+      senderUsername:
+        typeof p.senderUsername === 'string' && p.senderUsername.trim()
+          ? p.senderUsername
+          : undefined,
+      receiverUserId: String(p.receiverUserId ?? p.receiver ?? 'unknown'),
+      message: String(p.message ?? p.text ?? ''),
+      sentUtc: String(p.sentUtc ?? p.createdAt ?? new Date().toISOString()),
     }
   }
 
   return {
-    user: 'Server',
+    ...fallback,
+    senderUserId: 'server',
     message: 'Unsupported message payload received from hub',
-    createdAt: new Date().toISOString(),
   }
 }
 
@@ -55,7 +105,9 @@ export class SignalRChatClient {
 
   constructor() {
     this.connection = new HubConnectionBuilder()
-      .withUrl(HUB_URL)
+      .withUrl(HUB_URL, {
+        accessTokenFactory: () => getSessionToken(),
+      })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Information)
       .build()
@@ -65,7 +117,7 @@ export class SignalRChatClient {
     return this.connection.state
   }
 
-  async connect(onMessage: (message: IncomingChatMessage) => void) {
+  async connect(onMessage: (message: IncomingChatMessageEvent) => void) {
     if (this.connection.state === HubConnectionState.Connected) {
       return
     }
@@ -74,12 +126,26 @@ export class SignalRChatClient {
     this.connection.on(HUB_EVENTS.receiveMessage, (...args: unknown[]) => {
       const [first, second, third] = args
 
+      if (
+        typeof first === 'string'
+        && typeof second === 'string'
+        && typeof third === 'string'
+      ) {
+        onMessage({
+          senderUserId: first,
+          receiverUserId: second,
+          message: third,
+          sentUtc: new Date().toISOString(),
+        })
+        return
+      }
+
       if (typeof first === 'string' && typeof second === 'string') {
         onMessage({
-          user: first,
+          senderUserId: first,
+          receiverUserId: 'unknown',
           message: second,
-          room: typeof third === 'string' ? third : undefined,
-          createdAt: new Date().toISOString(),
+          sentUtc: new Date().toISOString(),
         })
         return
       }
@@ -90,25 +156,51 @@ export class SignalRChatClient {
     await this.connection.start()
   }
 
-  async joinRoom(room: string) {
+  async sendMessage(receiverUserId: string, message: string) {
     if (this.connection.state !== HubConnectionState.Connected) {
       throw new Error('SignalR connection is not established')
     }
 
-    await this.connection.invoke(HUB_METHODS.joinRoom, room)
-  }
+    const cleanReceiverUserId = receiverUserId.trim()
+    const cleanMessage = message.trim()
 
-  async sendMessage(user: string, message: string, room?: string) {
-    if (this.connection.state !== HubConnectionState.Connected) {
-      throw new Error('SignalR connection is not established')
+    if (!cleanReceiverUserId) {
+      throw new Error('receiverUserId is required')
     }
 
-    if (room) {
-      await this.connection.invoke(HUB_METHODS.sendMessage, room, user, message)
-      return
+    if (!cleanMessage) {
+      throw new Error('message is required')
     }
 
-    await this.connection.invoke(HUB_METHODS.sendMessage, user, message)
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!guidRegex.test(cleanReceiverUserId)) {
+      throw new Error(`receiverUserId is not a valid GUID: ${cleanReceiverUserId}`)
+    }
+
+    const payload = {
+      receiverUserId: cleanReceiverUserId,
+      message: cleanMessage,
+    }
+
+    try {
+      await this.connection.invoke(HUB_METHODS.sendMessage, payload)
+    } catch (error) {
+      const details = {
+        hubUrl: HUB_URL,
+        method: HUB_METHODS.sendMessage,
+        signature: 'SendMessage({ receiverUserId, message })',
+        payload,
+        error: formatErrorDetails(error),
+      }
+
+      console.error('[SignalR] SendMessage payload invoke failed', details)
+
+      const invokeError = new Error(
+        `SignalR SendMessage failed for object payload. Details: ${JSON.stringify(details)}`,
+      )
+      ;(invokeError as Error & { details?: unknown }).details = details
+      throw invokeError
+    }
   }
 
   async disconnect() {

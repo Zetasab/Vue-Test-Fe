@@ -462,7 +462,7 @@ function getGenreName(id: string): string {
 
 <style scoped>
 .filter-page {
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--app-navbar-height, 0px));
   padding: 1rem;
   background:
     radial-gradient(circle at 15% 10%, rgb(255 246 217 / 75%), transparent 42%),

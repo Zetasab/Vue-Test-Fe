@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useChatStore } from '@/stores/chat'
@@ -8,6 +8,11 @@ import { getSessionUser, logout } from '@/services/auth'
 const chatStore = useChatStore()
 const draftMessage = ref('')
 const router = useRouter()
+
+const receiverCandidates = computed(() => {
+  const senderId = chatStore.senderUserId?.trim()
+  return chatStore.users.filter((user) => user.id && user.id !== senderId)
+})
 
 function onSend() {
   chatStore.send(draftMessage.value)
@@ -20,8 +25,24 @@ async function onLogout() {
   await router.push('/login')
 }
 
-onMounted(() => {
-  chatStore.user = getSessionUser() || 'admin'
+onMounted(async () => {
+  const sessionUsername = getSessionUser() || 'admin'
+  chatStore.senderUserId = sessionUsername
+
+  await chatStore.bootstrap()
+
+  const currentUser = chatStore.users.find((user) => user.username === sessionUsername)
+  if (currentUser?.id) {
+    chatStore.senderUserId = currentUser.id
+  }
+
+  const selectedIsInvalid = !receiverCandidates.value.some(
+    (user) => user.id === chatStore.receiverUserId,
+  )
+
+  if (selectedIsInvalid) {
+    chatStore.receiverUserId = receiverCandidates.value[0]?.id ?? ''
+  }
 })
 
 onBeforeUnmount(() => {
@@ -37,17 +58,19 @@ onBeforeUnmount(() => {
       <button class="logout" @click="onLogout">Cerrar sesion</button>
 
       <label>
-        Usuario
-        <input v-model="chatStore.user" placeholder="admin" />
-      </label>
-
-      <label>
-        Sala
-        <input
-          :value="chatStore.room"
-          placeholder="general"
-          @change="chatStore.reconnectToRoom(($event.target as HTMLInputElement).value)"
-        />
+        Receiver User ID
+        <select v-model="chatStore.receiverUserId" :disabled="chatStore.loadingUsers">
+          <option value="" disabled>
+            {{ chatStore.loadingUsers ? 'Cargando usuarios...' : 'Selecciona usuario' }}
+          </option>
+          <option
+            v-for="user in receiverCandidates"
+            :key="user.id"
+            :value="user.id"
+          >
+            {{ user.username }} 
+          </option>
+        </select>
       </label>
 
       <div class="actions">
@@ -64,14 +87,16 @@ onBeforeUnmount(() => {
       </p>
 
       <p v-if="chatStore.error" class="error">{{ chatStore.error }}</p>
+      <pre v-if="chatStore.errorDetails" class="error-details">{{ chatStore.errorDetails }}</pre>
     </section>
 
     <section class="panel messages">
       <div class="message-list">
         <article v-for="item in chatStore.messages" :key="item.id" class="message-item">
-          <strong>{{ item.user }}</strong>
+          <strong>{{ item.senderUsername || item.senderUserId }}</strong>
+          <small>Para: {{ item.receiverUserId }}</small>
           <p>{{ item.message }}</p>
-          <time>{{ new Date(item.createdAt).toLocaleTimeString() }}</time>
+          <time>{{ new Date(item.sentUtc).toLocaleTimeString() }}</time>
         </article>
       </div>
 
@@ -92,7 +117,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1rem;
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--app-navbar-height, 0px));
   padding: 1.25rem;
   background: linear-gradient(180deg, #f3f9ff 0%, #ffffff 70%);
   color: #10243f;
@@ -123,6 +148,13 @@ label {
 }
 
 input {
+  border: 1px solid #c4d6ec;
+  border-radius: 8px;
+  padding: 0.6rem;
+  font-size: 0.95rem;
+}
+
+select {
   border: 1px solid #c4d6ec;
   border-radius: 8px;
   padding: 0.6rem;
@@ -165,6 +197,21 @@ button:disabled {
   color: #af1f38;
 }
 
+.error-details {
+  margin: 0;
+  border: 1px solid #efc2cb;
+  border-radius: 8px;
+  background: #fff6f8;
+  color: #6d1022;
+  padding: 0.6rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow: auto;
+}
+
 .messages {
   display: grid;
   grid-template-rows: 1fr auto;
@@ -175,7 +222,7 @@ button:disabled {
   border: 1px solid #e6eef8;
   border-radius: 8px;
   background: #fcfeff;
-  max-height: calc(100dvh - 9rem);
+  max-height: calc(100dvh - var(--app-navbar-height, 0px) - 9rem);
   overflow-y: auto;
   padding: 0.8rem;
 }
@@ -187,6 +234,11 @@ button:disabled {
 
 .message-item p {
   margin: 0.25rem 0;
+}
+
+.message-item small {
+  display: block;
+  color: #6b7c91;
 }
 
 time {

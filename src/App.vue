@@ -16,7 +16,7 @@ async function onLogout() {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'has-navbar': showNavbar }">
     <header v-if="showNavbar" class="navbar">
       <RouterLink to="/" class="brand">Vue Test FE</RouterLink>
 
@@ -42,7 +42,12 @@ async function onLogout() {
 }
 
 .app-shell {
+  --app-navbar-height: 0px;
   min-height: 100dvh;
+}
+
+.app-shell.has-navbar {
+  --app-navbar-height: 70px;
 }
 
 .navbar {
