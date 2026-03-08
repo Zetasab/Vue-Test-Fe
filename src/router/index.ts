@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import ChatView from '@/views/ChatView.vue'
+import ChatsView from '@/views/ChatsView.vue'
+import GameView from '@/views/GameView.vue'
+import HomeView from '@/views/HomeView.vue'
 import LoginView from '@/views/LoginView.vue'
 
 import { isLoggedIn } from '@/services/auth'
@@ -9,8 +11,24 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'chat',
-      component: ChatView,
+      name: 'home',
+      component: HomeView,
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/game',
+      name: 'game',
+      component: GameView,
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/chats',
+      name: 'chats',
+      component: ChatsView,
       meta: {
         requiresAuth: true,
       },
