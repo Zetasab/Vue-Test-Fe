@@ -1,15 +1,28 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { useChatStore } from '@/stores/chat'
+import { getSessionUser, logout } from '@/services/auth'
 
 const chatStore = useChatStore()
 const draftMessage = ref('')
+const router = useRouter()
 
 function onSend() {
   chatStore.send(draftMessage.value)
   draftMessage.value = ''
 }
+
+async function onLogout() {
+  await chatStore.disconnect()
+  logout()
+  await router.push('/login')
+}
+
+onMounted(() => {
+  chatStore.user = getSessionUser() || 'admin'
+})
 
 onBeforeUnmount(() => {
   chatStore.disconnect()
@@ -21,9 +34,11 @@ onBeforeUnmount(() => {
     <section class="panel controls">
       <h1>SignalR Chat</h1>
 
+      <button class="logout" @click="onLogout">Cerrar sesion</button>
+
       <label>
         Usuario
-        <input v-model="chatStore.user" placeholder="Tu nombre" />
+        <input v-model="chatStore.user" placeholder="admin" />
       </label>
 
       <label>
@@ -94,6 +109,11 @@ onBeforeUnmount(() => {
   display: grid;
   align-content: start;
   gap: 0.75rem;
+}
+
+.logout {
+  justify-self: end;
+  background-color: #af1f38;
 }
 
 label {
