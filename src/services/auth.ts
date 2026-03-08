@@ -1,9 +1,15 @@
+import { getApiErrorStatus, post } from './baseService'
+import { getInfo } from './info'
+
 export const AUTH_SESSION_KEY = 'auth.session'
 export const AUTH_SAVED_CREDENTIALS_KEY = 'auth.savedCredentials'
+
+const AUTH_LOGIN_ENDPOINT = import.meta.env.VITE_AUTH_LOGIN_ENDPOINT ?? '/users/users/login'
 
 export interface AuthSession {
   username: string
   loggedAt: string
+  token?: string
 }
 
 export interface SavedCredentials {
@@ -11,8 +17,16 @@ export interface SavedCredentials {
   password: string
 }
 
-const DEFAULT_USER = 'admin'
-const DEFAULT_PASSWORD = 'password'
+export interface UserLogin {
+  username: string
+  password: string
+}
+
+export interface UserResponse {
+  username?: string
+  token?: string
+  [key: string]: unknown
+}
 
 export function isLoggedIn(): boolean {
   const raw = sessionStorage.getItem(AUTH_SESSION_KEY)
@@ -22,7 +36,7 @@ export function isLoggedIn(): boolean {
 
   try {
     const parsed = JSON.parse(raw) as Partial<AuthSession>
-    return parsed.username === DEFAULT_USER
+    return !!parsed.username
   } catch {
     return false
   }
@@ -42,20 +56,40 @@ export function getSessionUser(): string {
   }
 }
 
-export function login(username: string, password: string): boolean {
-  const cleanUser = username.trim()
+export async function login(username: string, password: string): Promise<boolean> {
+  const payload: UserLogin = {
+    username: username.trim(),
+    password,
+  }
 
-  if (cleanUser !== DEFAULT_USER || password !== DEFAULT_PASSWORD) {
+  if (!payload.username || !payload.password) {
     return false
   }
 
-  const session: AuthSession = {
-    username: cleanUser,
-    loggedAt: new Date().toISOString(),
-  }
+  // Required request chain: first GET /info, then POST login.
+  await getInfo()
 
-  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session))
-  return true
+  try {
+    const response = await post<UserResponse, UserLogin>(AUTH_LOGIN_ENDPOINT, payload)
+
+    const session: AuthSession = {
+      username:
+        typeof response.username === 'string' && response.username.trim()
+          ? response.username
+          : payload.username,
+      loggedAt: new Date().toISOString(),
+      token: typeof response.token === 'string' ? response.token : undefined,
+    }
+
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session))
+    return true
+  } catch (error) {
+    if (getApiErrorStatus(error) === 401) {
+      return false
+    }
+
+    throw error
+  }
 }
 
 export function logout(): void {

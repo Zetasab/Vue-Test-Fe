@@ -41,10 +41,10 @@ async function onSubmit() {
   error.value = ''
 
   try {
-    const success = login(username.value, userPassword.value)
+    const success = await login(username.value, userPassword.value)
 
     if (!success) {
-      error.value = 'Credenciales invalidas. Usa admin / password.'
+      error.value = 'Credenciales invalidas.'
       return
     }
 
@@ -55,6 +55,8 @@ async function onSubmit() {
     }
 
     await router.replace(targetPath.value)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'No se pudo iniciar sesion'
   } finally {
     loading.value = false
   }
