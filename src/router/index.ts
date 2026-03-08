@@ -7,6 +7,15 @@ import LoginView from '@/views/LoginView.vue'
 
 import { isLoggedIn } from '@/services/auth'
 
+function isLocalChatEnabled() {
+  if (import.meta.env.DEV) {
+    return true
+  }
+
+  const host = window.location.hostname.toLowerCase()
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -51,6 +60,12 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.name === 'chats' && !isLocalChatEnabled()) {
+    return {
+      path: '/',
+    }
+  }
+
   if (to.name === 'login' && isLoggedIn()) {
     return {
       path: '/',

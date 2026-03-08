@@ -8,6 +8,14 @@ const route = useRoute()
 const router = useRouter()
 
 const showNavbar = computed(() => route.name !== 'login')
+const showChat = computed(() => {
+  if (import.meta.env.DEV) {
+    return true
+  }
+
+  const host = window.location.hostname.toLowerCase()
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+})
 
 async function onLogout() {
   logout()
@@ -24,7 +32,7 @@ async function onLogout() {
         <RouterLink to="/" class="link">Home</RouterLink>
         <RouterLink to="/game" class="link">Game</RouterLink>
         <RouterLink to="/game-filter" class="link">Filter Games</RouterLink>
-        <RouterLink to="/chats" class="link">Chats</RouterLink>
+        <RouterLink v-if="showChat" to="/chats" class="link">Chats</RouterLink>
       </nav>
 
       <button class="logout" @click="onLogout">Logout</button>
