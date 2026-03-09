@@ -28,6 +28,7 @@ const HUB_URL = buildHubUrl()
 
 const HUB_METHODS = {
   sendMessage: import.meta.env.VITE_SIGNALR_SEND_METHOD ?? 'SendMessage',
+  getHistory: import.meta.env.VITE_SIGNALR_GET_HISTORY_METHOD ?? 'GetHistory',
 }
 
 const HUB_EVENTS = {
@@ -201,6 +202,33 @@ export class SignalRChatClient {
       ;(invokeError as Error & { details?: unknown }).details = details
       throw invokeError
     }
+  }
+
+  async getHistory(otherUserId: string, limit = 20): Promise<IncomingChatMessageEvent[]> {
+    if (this.connection.state !== HubConnectionState.Connected) {
+      throw new Error('SignalR connection is not established')
+    }
+
+    const cleanOtherUserId = otherUserId.trim()
+    if (!cleanOtherUserId) {
+      throw new Error('otherUserId is required')
+    }
+
+    if (!Number.isFinite(limit) || limit <= 0) {
+      throw new Error('limit must be greater than 0')
+    }
+
+    const response = await this.connection.invoke<unknown>(
+      HUB_METHODS.getHistory,
+      cleanOtherUserId,
+      limit,
+    )
+
+    if (!Array.isArray(response)) {
+      return []
+    }
+
+    return response.map(normalizeMessage)
   }
 
   async disconnect() {
