@@ -1,59 +1,125 @@
 # Vue-Test-Fe
 
-This template should help get you started developing with Vue 3 in Vite.
+> Proyecto de prueba para aprender Vue 3 + TypeScript.
+>
+> Este repositorio **no representa** la forma en que trabajo profesionalmente en produccion.
+> Es un sandbox para practicar arquitectura frontend, consumo de APIs y chat en tiempo real con SignalR.
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Que es este proyecto
 
-## Recommended Browser Setup
+`Vue-Test-Fe` es una app frontend hecha con:
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- `Vue 3` + `Vite`
+- `TypeScript`
+- `Vue Router`
+- `Pinia`
+- `PrimeVue` (tema `Aura`)
+- `SignalR` para chat en tiempo real
 
-## Type Support for `.vue` Imports in TS
+La idea principal es practicar:
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- Autenticacion simple en frontend
+- Consumo de endpoints REST
+- Rutas protegidas
+- Estructura por modulos (`models`, `services`, `views`)
+- Integracion de chat en tiempo real
 
-## Customize configuration
+---
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Como funciona (resumen rapido)
 
-## Project Setup
+1. El usuario entra por `/login`.
+2. Si el login es correcto, se guarda una sesion en `sessionStorage` (`auth.session`).
+3. El router protege vistas con `meta.requiresAuth`.
+4. Los servicios en `src/services` consumen la API con `fetch` centralizado en `baseService.ts`.
+5. Si una llamada responde `401`, se limpia sesion y se redirige a `/login`.
+6. El modulo de chat usa SignalR y envia token con `accessTokenFactory`.
 
-```sh
-npm install
+---
+
+## Mapa del proyecto
+
+```text
+src/
+  models/        # Tipos y modelos de dominio (games, users, base)
+  services/      # Capa de acceso a API, auth y SignalR
+  stores/        # Estado global con Pinia
+  router/        # Rutas y guards de autenticacion
+  views/         # Pantallas (login, game, chats, filtros)
+  App.vue        # Shell principal
+  main.ts        # Bootstrap de Vue + plugins
 ```
 
-### Compile and Hot-Reload for Development
+---
 
-```sh
-npm run dev
+## Rutas principales
+
+- `/login`: acceso de usuario
+- `/`: home (protegida)
+- `/game`: vista de juego (protegida)
+- `/game-filter`: filtro de juegos (protegida)
+- `/chats`: chat (protegida, habilitada en local/dev)
+
+Nota: la ruta `/chats` solo se habilita en `DEV` o en `localhost/127.0.0.1/::1`.
+
+---
+
+## Variables de entorno
+
+Configura un archivo `.env` (puedes usar `.env.example` como base):
+
+```env
+VITE_API_BASE_URL=https://localhost:7116
+VITE_AUTH_LOGIN_ENDPOINT=/users/users/login
+
+VITE_SIGNALR_HUB_URL=https://localhost:7116/hubs/chat
+VITE_SIGNALR_SEND_METHOD=SendMessage
+VITE_SIGNALR_RECEIVE_EVENT=ReceiveMessage
 ```
 
-## SignalR setup
+Notas:
 
-1. Crea tu archivo `.env` tomando como base `.env.example`.
-2. Ajusta `VITE_SIGNALR_HUB_URL` con la URL real de tu Hub (ejemplo: `https://localhost:5001/chathub`).
-3. Si en backend usas otros nombres de metodos/eventos, cambia:
-  - `VITE_SIGNALR_JOIN_METHOD`
-  - `VITE_SIGNALR_SEND_METHOD`
-  - `VITE_SIGNALR_RECEIVE_EVENT`
+- Si `VITE_API_BASE_URL` no existe, se usa fallback segun entorno (dev/prod).
+- Si no defines variables de SignalR, se usan valores por defecto.
 
-Con eso, la ruta `/` del frontend levanta una UI de chat conectada por SignalR.
+---
 
-### Type-Check, Compile and Minify for Production
+## Requisitos
 
-```sh
-npm run build
+- `Node.js` `^20.19.0` o `>=22.12.0`
+- `npm`
+
+---
+
+## Scripts
+
+```bash
+npm install        # Instala dependencias
+npm run dev        # Levanta entorno local con Vite
+npm run build      # Type-check + build de produccion
+npm run preview    # Sirve build local para revisar
+npm run lint       # Ejecuta oxlint + eslint con fix
+npm run format     # Formatea src/ con Prettier
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+---
 
-```sh
-npm run lint
-```
+## Setup recomendado
+
+- IDE: [VS Code](https://code.visualstudio.com/)
+- Extension: [Vue (Official) / Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- Devtools: [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+
+---
+
+## Objetivo de aprendizaje
+
+Este repo existe para experimentar y aprender:
+
+- Probar ideas rapido
+- Validar integraciones con backend
+- Practicar patrones de frontend en Vue
+
+Si encuentras decisiones de codigo "simples" o "de prueba", es intencional por el contexto del proyecto.
